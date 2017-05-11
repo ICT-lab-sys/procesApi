@@ -10,7 +10,8 @@ const express = require('express')
 const http = require('http')
 const os = require('os')
 const http_stream = require('client-http');
-
+let oldInterval;
+let newInterval;
 const app = express()
 
 /**
@@ -42,10 +43,28 @@ const influx = new Influx.InfluxDB({
  */
 var oldData = "dfsd"
 var timer = setInterval(getData, 1000);
+var timer1 = setInterval(checkDataIntervals, 5000)
 function getData () {
     http_stream.get("http://localhost:3001/api/streamdata/temp", function(data) {
-        var json = JSON.parse(data)
-        const graden = json.Temperature;
+
+            if(data == null){
+                console.log("streamdata uitgevallen")
+                return;
+            }
+            if(data[13] == 'u'){
+            console.log("parsen mag nog niet")
+            return;
+             }
+            if(data[13] != 'u'){
+                var json = JSON.parse(data)
+            }
+
+
+
+
+            const graden = json.Temperature
+
+
       //  console.log(json.Temperature)
 
     if(JSON.stringify(oldData) != JSON.stringify(json)) {
@@ -69,7 +88,7 @@ app.get('/', function (req, res) {
     setTimeout(() => res.end('Hello world!'), Math.random() * 500)
 })
 
-app.get('/temp/1', function (req, res) {
+app.get('/temp/1', function (req, res, next) {
     influx.query(`
     select * from temperatuur
     where id = 1
@@ -77,17 +96,18 @@ app.get('/temp/1', function (req, res) {
   `).then(result => {
         res.json(result)
 }).catch(err => {
-        res.status(500).send(err.stack)
+        next(res.status(500).send(err.stack))
 })
 })
+
 
 /**
  * Now, we'll make sure the database exists and boot the app.
  */
 influx.getDatabaseNames()
     .then(names => {
-    if (!names.includes('temperatuur')) {
-    return influx.createDatabase('temperatuur')
+    if (!names.includes('metingen')) {
+    return influx.createDatabase('metingen')
 }
 })
 .then(() => {
@@ -98,3 +118,24 @@ influx.getDatabaseNames()
 .catch(err => {
     console.error(`Error creating Influx database!`)
 })
+
+ function checkDataIntervals() {
+    influx.query(`
+     select * from temperatuur
+     where id = 1
+     order by time desc
+     limit 1`).then(result => {
+       oldInterval = JSON.stringify(result)
+}).catch(err => {
+        next(res.status(500).send(err.stack))
+    })
+     if(newInterval != oldInterval){
+        console.log("data is niet gelijk")
+        newInterval = oldInterval
+         return;
+     }
+     if (newInterval == oldInterval){
+         console.log("data is gelijk")
+     }
+
+}

@@ -42,56 +42,79 @@ const influx = new Influx.InfluxDB({
  * ends we'll write how long the response took to Influx!
  */
 var oldData = "dfsd"
-var timer = setInterval(getData, 1000);
+var timer = setInterval(getData, 3000);
 var timer1 = setInterval(checkDataIntervals, 5000)
-function getData () {
-    http_stream.get("http://localhost:3001/api/streamdata/temp", function(data) {
 
-            if(data == null){
-                console.log("streamdata uitgevallen")
-                return;
-            }
-            if(data[13] == 'u'){
+
+function getData () {
+    var i = 1;
+    http_stream.get("http://localhost:3001/api/streamdata/activenodes", function(data) {
+        for( i; i <= JSON.parse(data).temp; i++ ) {
+           // console.log("getData() i: "+i)
+            processData(i)
+
+        }
+    })
+}
+
+function processData(i){
+  //  console.log("processData() buiten httpstream i: "+i)
+    http_stream.get("http://localhost:3001/api/streamdata/temp/"+i, function (data) {
+       // console.log("processData() binnen httpstream i: "+i)
+
+
+        if (data == null) {
+            console.log("streamdata uitgevallen")
+            return;
+        }
+        if (data[13] == 'u') {
             console.log("parsen mag nog niet")
             return;
-             }
-            if(data[13] != 'u'){
-                var json = JSON.parse(data)
-            }
+        }
+        if (data[13] != 'u') {
+            var json = JSON.parse(data)
+        }
+
+
+        const graden = json.Temperature
+      // console.log("buiten de if i: "+i)
+
+
+        insertData(graden, json, i)
+
+
+    })
+}
 
 
 
 
-            const graden = json.Temperature
+function insertData(graden, json, i){
 
-
-      //  console.log(json.Temperature)
-
-    if(JSON.stringify(oldData) != JSON.stringify(json)) {
-        // var test = oldData
-        oldData = json;
-       // console.log(JSON.stringify(oldData) + "  ," + JSON.stringify(json))
+    // if (JSON.stringify(oldData) != JSON.stringify(json)) {
+    //        console.log("in de if begin i: "+i)
+    //     oldData = json;
         influx.writePoints([
             {
                 measurement: 'temperatuur',
-                tags: { host: os.hostname() },
-                fields: { graden, id: 1} //, path: req.path
+                tags: {host: os.hostname()},
+                fields: {graden, id: i} //, path: req.path
             }
         ]).catch(err => {
             console.error(`Error saving data to InfluxDB! ${err.stack}`)
         })
-    }
-    })
+          console.log("einde i: "+i)
+   // }
 }
 
 app.get('/', function (req, res) {
     setTimeout(() => res.end('Hello world!'), Math.random() * 500)
 })
 
-app.get('/temp/1', function (req, res, next) {
+app.get('/temp/:id', function (req, res, next) {
     influx.query(`
     select * from temperatuur
-    where id = 1
+    where id =` + req.params.id + `
     order by time desc
   `).then(result => {
         res.json(result)
@@ -99,6 +122,13 @@ app.get('/temp/1', function (req, res, next) {
         next(res.status(500).send(err.stack))
 })
 })
+
+// app.get('/temp/stop/:id', function (req, res, next) {
+//
+//     http_stream.get("http://localhost:3001/api/streamdata/temp/" + req.params.id, function (data) {
+//
+//     })
+// })
 
 
 /**

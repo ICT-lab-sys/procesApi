@@ -13,7 +13,8 @@ const http_stream = require('client-http');
 let oldInterval;
 let newInterval;
 const app = express()
-
+var TotalWorkingNodes
+var DataNotUpdatedCount
 /**
  * Create a new Influx client. We tell it to use the
  * `express_response_db` database by default, and give
@@ -26,8 +27,8 @@ const influx = new Influx.InfluxDB({
         {
             measurement: 'temperatuur',
             fields: {
-                //path: Influx.FieldType.STRING,
                 graden: Influx.FieldType.INTEGER,
+                //path: Influx.FieldType.STRING,
                 id: Influx.FieldType.INTEGER
             },
             tags: [
@@ -49,11 +50,19 @@ var timer1 = setInterval(checkDataIntervals, 5000)
 function getData () {
     var i = 1;
     http_stream.get("http://localhost:3001/api/streamdata/activenodes", function(data) {
+        if (data == null) {
+            DataNotUpdatedCount++;
+            console.log(DataNotUpdatedCount)
+            return;
+        }
+        DataNotUpdatedCount = 0;
+
         for( i; i <= JSON.parse(data).temp; i++ ) {
            // console.log("getData() i: "+i)
             processData(i)
 
         }
+        //TotalWorkingNodes = JSON.parse(data).temp;
     })
 }
 
@@ -117,7 +126,16 @@ app.get('/temp/:id', function (req, res, next) {
     where id =` + req.params.id + `
     order by time desc
   `).then(result => {
+        if(DataNotUpdatedCount > 3 && DataNotUpdatedCount < 30){
+            next(res.status(404).send(result));
+            return;
+        }
+        if(DataNotUpdatedCount >= 30){
+            next(res.status(500).send(result));
+            return;
+        }
         res.json(result)
+
 }).catch(err => {
         next(res.status(500).send(err.stack))
 })
@@ -150,22 +168,25 @@ influx.getDatabaseNames()
 })
 
  function checkDataIntervals() {
-    influx.query(`
+
+    for(var i = 1; i <= TotalWorkingNodes; i++) {
+        influx.query(`
      select * from temperatuur
-     where id = 1
+     where id = ` + i + `
      order by time desc
      limit 1`).then(result => {
-       oldInterval = JSON.stringify(result)
-}).catch(err => {
-        next(res.status(500).send(err.stack))
-    })
-     if(newInterval != oldInterval){
-        console.log("data is niet gelijk")
-        newInterval = oldInterval
-         return;
-     }
-     if (newInterval == oldInterval){
-         console.log("data is gelijk")
-     }
+            oldInterval = JSON.stringify(result)
+        }).catch(err => {
+            next(res.status(500).send(err.stack))
+        })
+        if (newInterval != oldInterval) {
+            console.log("data is niet gelijk")
+            newInterval = oldInterval
+            return;
+        }
+        if (newInterval == oldInterval) {
+            DataNotUpdatedCount++
+        }
+    }
 
 }

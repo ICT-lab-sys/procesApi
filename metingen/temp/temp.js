@@ -1,10 +1,3 @@
-/**
- * In this example we'll create a server which has an index page that prints
- * out "hello world", and a page `http://localhost:3000/times` which prints
- * out the last ten response times that InfluxDB gave us.
- *
- * Get started by importing everything we need!
- */
 const Influx = require('influx')
 const express = require('express')
 const http = require('http')
@@ -15,11 +8,9 @@ let newInterval;
 const app = express()
 var TotalWorkingNodes
 var DataNotUpdatedCount
-/**
- * Create a new Influx client. We tell it to use the
- * `express_response_db` database by default, and give
- * it some information about the schema we're writing.
- */
+var humid = require('../humidity/humid');
+var router = express.Router()
+
 const influx = new Influx.InfluxDB({
     host: 'localhost',
     database: 'metingen',
@@ -38,10 +29,6 @@ const influx = new Influx.InfluxDB({
     ]
 })
 
-/**
- * Next we define our middleware and hook into the response stream. When it
- * ends we'll write how long the response took to Influx!
- */
 var oldData = "dfsd"
 var timer = setInterval(getData, 3000);
 var timer1 = setInterval(checkDataIntervals, 5000)
@@ -49,7 +36,7 @@ var timer1 = setInterval(checkDataIntervals, 5000)
 
 function getData () {
     var i = 1;
-    http_stream.get("http://localhost:3001/api/streamdata/activenodes", function(data) {
+    http_stream.get("http://localhost:3001/api/streamdata/activenodes/temp", function(data) {
         if (data == null) {
             DataNotUpdatedCount++;
             console.log(DataNotUpdatedCount)
@@ -58,19 +45,19 @@ function getData () {
         DataNotUpdatedCount = 0;
 
         for( i; i <= JSON.parse(data).temp; i++ ) {
-           // console.log("getData() i: "+i)
             processData(i)
 
         }
-        //TotalWorkingNodes = JSON.parse(data).temp;
     })
 }
 
 function processData(i){
-  //  console.log("processData() buiten httpstream i: "+i)
     http_stream.get("http://localhost:3001/api/streamdata/temp/"+i, function (data) {
-       // console.log("processData() binnen httpstream i: "+i)
+        var stringdata = data.toString()
 
+        if(stringdata == 'sensor gestopt'){
+            return
+        }
 
         if (data == null) {
             console.log("streamdata uitgevallen")
@@ -86,41 +73,30 @@ function processData(i){
 
 
         const graden = json.Temperature
-      // console.log("buiten de if i: "+i)
-
-
         insertData(graden, json, i)
 
 
     })
 }
 
-
-
-
 function insertData(graden, json, i){
-
-    // if (JSON.stringify(oldData) != JSON.stringify(json)) {
-    //        console.log("in de if begin i: "+i)
-    //     oldData = json;
         influx.writePoints([
             {
                 measurement: 'temperatuur',
                 tags: {host: os.hostname()},
-                fields: {graden, id: i} //, path: req.path
+                fields: {graden, id: i}
             }
         ]).catch(err => {
             console.error(`Error saving data to InfluxDB! ${err.stack}`)
         })
           console.log("einde i: "+i)
-   // }
 }
 
-app.get('/', function (req, res) {
+router.get('/', function (req, res) {
     setTimeout(() => res.end('Hello world!'), Math.random() * 500)
 })
 
-app.get('/temp/:id', function (req, res, next) {
+router.get('/temp/:id', function (req, res, next) {
     influx.query(`
     select * from temperatuur
     where id =` + req.params.id + `
@@ -141,27 +117,11 @@ app.get('/temp/:id', function (req, res, next) {
 })
 })
 
-// app.get('/temp/stop/:id', function (req, res, next) {
-//
-//     http_stream.get("http://localhost:3001/api/streamdata/temp/" + req.params.id, function (data) {
-//
-//     })
-// })
-
-
-/**
- * Now, we'll make sure the database exists and boot the app.
- */
 influx.getDatabaseNames()
     .then(names => {
     if (!names.includes('metingen')) {
     return influx.createDatabase('metingen')
 }
-})
-.then(() => {
-    http.createServer(app).listen(3000, function () {
-    console.log('Listening on port 3000')
-})
 })
 .catch(err => {
     console.error(`Error creating Influx database!`)
@@ -190,3 +150,4 @@ influx.getDatabaseNames()
     }
 
 }
+module.exports = router

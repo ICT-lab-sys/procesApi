@@ -8,6 +8,8 @@ let newInterval;
 const app = express()
 var TotalWorkingNodes
 var DataNotUpdatedCount
+var humid = require('../humidity/humid');
+var router = express.Router()
 
 const influx = new Influx.InfluxDB({
     host: 'localhost',
@@ -34,7 +36,7 @@ var timer1 = setInterval(checkDataIntervals, 5000)
 
 function getData () {
     var i = 1;
-    http_stream.get("http://localhost:3001/api/streamdata/activenodes", function(data) {
+    http_stream.get("http://localhost:3001/api/streamdata/activenodes/temp", function(data) {
         if (data == null) {
             DataNotUpdatedCount++;
             console.log(DataNotUpdatedCount)
@@ -51,13 +53,12 @@ function getData () {
 
 function processData(i){
     http_stream.get("http://localhost:3001/api/streamdata/temp/"+i, function (data) {
-       console.log(data)
         var stringdata = data.toString()
 
-        if (stringdata == 'sensor gestopt') {
-            console.log('sensor gestopt')
+        if(stringdata == 'sensor gestopt'){
             return
         }
+
         if (data == null) {
             console.log("streamdata uitgevallen")
             return;
@@ -69,8 +70,12 @@ function processData(i){
         if (data[13] != 'u') {
             var json = JSON.parse(data)
         }
+
+
         const graden = json.Temperature
         insertData(graden, json, i)
+
+
     })
 }
 
@@ -79,7 +84,7 @@ function insertData(graden, json, i){
             {
                 measurement: 'temperatuur',
                 tags: {host: os.hostname()},
-                fields: {graden, id: i} //, path: req.path
+                fields: {graden, id: i}
             }
         ]).catch(err => {
             console.error(`Error saving data to InfluxDB! ${err.stack}`)
@@ -87,11 +92,11 @@ function insertData(graden, json, i){
           console.log("einde i: "+i)
 }
 
-app.get('/', function (req, res) {
+router.get('/', function (req, res) {
     setTimeout(() => res.end('Hello world!'), Math.random() * 500)
 })
 
-app.get('/temp/:id', function (req, res, next) {
+router.get('/temp/:id', function (req, res, next) {
     influx.query(`
     select * from temperatuur
     where id =` + req.params.id + `
@@ -112,17 +117,11 @@ app.get('/temp/:id', function (req, res, next) {
 })
 })
 
-
 influx.getDatabaseNames()
     .then(names => {
     if (!names.includes('metingen')) {
     return influx.createDatabase('metingen')
 }
-})
-.then(() => {
-    http.createServer(app).listen(3000, function () {
-    console.log('Listening on port 3000')
-})
 })
 .catch(err => {
     console.error(`Error creating Influx database!`)
@@ -151,3 +150,4 @@ influx.getDatabaseNames()
     }
 
 }
+module.exports = router

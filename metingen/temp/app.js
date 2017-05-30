@@ -1,10 +1,3 @@
-/**
- * In this example we'll create a server which has an index page that prints
- * out "hello world", and a page `http://localhost:3000/times` which prints
- * out the last ten response times that InfluxDB gave us.
- *
- * Get started by importing everything we need!
- */
 const Influx = require('influx')
 const express = require('express')
 const http = require('http')
@@ -15,11 +8,7 @@ let newInterval;
 const app = express()
 var TotalWorkingNodes
 var DataNotUpdatedCount
-/**
- * Create a new Influx client. We tell it to use the
- * `express_response_db` database by default, and give
- * it some information about the schema we're writing.
- */
+
 const influx = new Influx.InfluxDB({
     host: 'localhost',
     database: 'metingen',
@@ -38,10 +27,6 @@ const influx = new Influx.InfluxDB({
     ]
 })
 
-/**
- * Next we define our middleware and hook into the response stream. When it
- * ends we'll write how long the response took to Influx!
- */
 var oldData = "dfsd"
 var timer = setInterval(getData, 3000);
 var timer1 = setInterval(checkDataIntervals, 5000)
@@ -58,20 +43,21 @@ function getData () {
         DataNotUpdatedCount = 0;
 
         for( i; i <= JSON.parse(data).temp; i++ ) {
-           // console.log("getData() i: "+i)
             processData(i)
 
         }
-        //TotalWorkingNodes = JSON.parse(data).temp;
     })
 }
 
 function processData(i){
-  //  console.log("processData() buiten httpstream i: "+i)
     http_stream.get("http://localhost:3001/api/streamdata/temp/"+i, function (data) {
-       // console.log("processData() binnen httpstream i: "+i)
+       console.log(data)
+        var stringdata = data.toString()
 
-
+        if (stringdata == 'sensor gestopt') {
+            console.log('sensor gestopt')
+            return
+        }
         if (data == null) {
             console.log("streamdata uitgevallen")
             return;
@@ -83,26 +69,12 @@ function processData(i){
         if (data[13] != 'u') {
             var json = JSON.parse(data)
         }
-
-
         const graden = json.Temperature
-      // console.log("buiten de if i: "+i)
-
-
         insertData(graden, json, i)
-
-
     })
 }
 
-
-
-
 function insertData(graden, json, i){
-
-    // if (JSON.stringify(oldData) != JSON.stringify(json)) {
-    //        console.log("in de if begin i: "+i)
-    //     oldData = json;
         influx.writePoints([
             {
                 measurement: 'temperatuur',
@@ -113,7 +85,6 @@ function insertData(graden, json, i){
             console.error(`Error saving data to InfluxDB! ${err.stack}`)
         })
           console.log("einde i: "+i)
-   // }
 }
 
 app.get('/', function (req, res) {
@@ -141,17 +112,7 @@ app.get('/temp/:id', function (req, res, next) {
 })
 })
 
-// app.get('/temp/stop/:id', function (req, res, next) {
-//
-//     http_stream.get("http://localhost:3001/api/streamdata/temp/" + req.params.id, function (data) {
-//
-//     })
-// })
 
-
-/**
- * Now, we'll make sure the database exists and boot the app.
- */
 influx.getDatabaseNames()
     .then(names => {
     if (!names.includes('metingen')) {

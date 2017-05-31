@@ -58,6 +58,9 @@ function processData(i){
             return
         }
 
+        if(stringdata == 'No sensor found'){
+            return
+        }
 
         if (data == null) {
             console.log("streamdata uitgevallen")
@@ -94,6 +97,15 @@ function insertData(humidity, json, i){
 
 router.get('/', function (req, res) {
     setTimeout(() => res.end('Hello world!'), Math.random() * 500)
+})
+
+router.get('/humidity/remove/:id', function (req, res, next) {
+    var id = req.params.id
+    http_stream.get("http://localhost:3001/api/streamdata/humidity/remove/"+id, function(data) {
+        console.log('gelukt data verwijderd')
+    })
+    res.send('gelukt')
+
 })
 
 router.get('/humidity/:id', function (req, res, next) {

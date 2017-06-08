@@ -92,7 +92,7 @@ function insertData(light, json, i){
     ]).catch(err => {
         console.error(`Error saving data to InfluxDB! ${err.stack}`)
     })
-    console.log("einde i: "+i)
+   // console.log("einde i: "+i)
 }
 
 router.get('/', function (req, res) {

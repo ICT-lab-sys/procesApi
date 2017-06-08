@@ -19,7 +19,6 @@ const influx = new Influx.InfluxDB({
             measurement: 'temperatuur',
             fields: {
                 graden: Influx.FieldType.INTEGER,
-                //path: Influx.FieldType.STRING,
                 id: Influx.FieldType.INTEGER
             },
             tags: [
@@ -92,7 +91,7 @@ function insertData(graden, json, i){
         ]).catch(err => {
             console.error(`Error saving data to InfluxDB! ${err.stack}`)
         })
-          console.log("einde i: "+i)
+        //  console.log("einde i: "+i)
 }
 
 router.get('/', function (req, res) {
@@ -160,4 +159,25 @@ influx.getDatabaseNames()
     }
 
 }
+
+router.get('/temp/:month/:id', function (req, res, next) {
+    var month = req.params.month
+    var id = req.params.id
+    var getDaysInMonth = function(month,year) {
+        return new Date(year, month, 0).getDate();
+    };
+    var aantaldagen = getDaysInMonth(month, 2017)
+    console.log('time >= 2017-0'+month+'-01 and time <= 2017-06-'+aantaldagen+'')
+    influx.query(`
+    select mean("graden") from temperatuur
+    where id = `+req.params.id+` and time >= '2017-0`+month+`-01' and time <= '2017-0`+month+`-`+aantaldagen+`'
+    group by time(1d)
+  `
+    ).then(result => {
+        res.json(result)
+    }).catch(err => {
+        next(res.status(500).send(err.stack))
+    })
+})
+
 module.exports = router

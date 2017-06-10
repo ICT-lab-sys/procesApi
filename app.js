@@ -2,6 +2,8 @@ const Influx = require('influx')
 const express = require('express')
 const http = require('http')
 const app = express()
+var cors = require('cors');
+app.use(cors({origin: 'http://localhost:4200'}));
 
 
 

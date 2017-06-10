@@ -160,17 +160,34 @@ influx.getDatabaseNames()
 
 }
 
-router.get('/temp/:month/:id', function (req, res, next) {
+router.get('/:sensor/:year/:month/:id', function (req, res, next) {
+    var year = req.params.year
+    var sensor = req.params.sensor
     var month = req.params.month
     var id = req.params.id
+    var datatype;
+    if(sensor == 'temperatuur'){
+        datatype = 'graden'
+    }
+    if(sensor == 'luchtvochtigheid'){
+        sensor = 'humidity'
+        datatype = "humidity"
+    }
+    if(sensor == 'licht'){
+        sensor = 'light'
+        datatype = "light"
+    }
+    // select mean(`+datatype+`) from `+sensor+`
+    console.log("S:", sensor)
+    console.log("D", datatype)
     var getDaysInMonth = function(month,year) {
         return new Date(year, month, 0).getDate();
     };
-    var aantaldagen = getDaysInMonth(month, 2017)
+    var aantaldagen = getDaysInMonth(month, year)
     console.log('time >= 2017-0'+month+'-01 and time <= 2017-06-'+aantaldagen+'')
     influx.query(`
-    select mean("graden") from temperatuur
-    where id = `+req.params.id+` and time >= '2017-0`+month+`-01' and time <= '2017-0`+month+`-`+aantaldagen+`'
+    select mean(`+datatype+`) from `+sensor+`
+    where id = `+id+` and time >= '`+year+`-0`+month+`-01' and time <= '`+year+`-0`+month+`-`+aantaldagen+`'
     group by time(1d)
   `
     ).then(result => {

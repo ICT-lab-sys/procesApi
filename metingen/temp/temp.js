@@ -126,6 +126,14 @@ router.get('/temp/:id', function (req, res, next) {
 })
 })
 
+router.get('/temp/sensors/totaal', function (req, res, next) {
+    var totaal;
+    http_stream.get("http://localhost:3001/temp/sensors/totaal", function(data) {
+        totaal = data
+        res.send(totaal)
+    })
+})
+
 influx.getDatabaseNames()
     .then(names => {
     if (!names.includes('metingen')) {

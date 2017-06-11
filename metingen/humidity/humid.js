@@ -129,6 +129,14 @@ router.get('/humidity/:id', function (req, res, next) {
     })
 })
 
+router.get('/humidity/sensors/totaal', function (req, res, next) {
+    var totaal;
+    http_stream.get("http://localhost:3001/humidity/sensors/totaal", function(data) {
+        totaal = data
+        res.send(totaal)
+    })
+})
+
 influx.getDatabaseNames()
     .then(names => {
         if (!names.includes('metingen')) {

@@ -10,6 +10,7 @@ var TotalWorkingNodes
 var DataNotUpdatedCount
 var router = express.Router()
 
+//maak een schema van de database
 const influx = new Influx.InfluxDB({
     host: 'localhost',
     database: 'metingen',
@@ -32,7 +33,7 @@ var oldData = "dfsd"
 var timer = setInterval(getData, 3000);
 var timer1 = setInterval(checkDataIntervals, 5000)
 
-
+//krijg alle actievenodes
 function getData () {
     var i = 1;
     http_stream.get("http://localhost:3001/api/streamdata/activenodes/humidity", function(data) {
@@ -50,6 +51,7 @@ function getData () {
     })
 }
 
+//controleer data en roep de fucntie om de data in de database te zetten.
 function processData(i){
     http_stream.get("http://localhost:3001/api/streamdata/humidity/"+i, function (data) {
         var stringdata = data.toString()
@@ -82,6 +84,7 @@ function processData(i){
     })
 }
 
+//zet de streamdata in de database
 function insertData(humidity, json, i){
     influx.writePoints([
         {
@@ -92,13 +95,9 @@ function insertData(humidity, json, i){
     ]).catch(err => {
         console.error(`Error saving data to InfluxDB! ${err.stack}`)
     })
-    //console.log("einde i: "+i)
 }
 
-router.get('/', function (req, res) {
-    setTimeout(() => res.end('Hello world!'), Math.random() * 500)
-})
-
+//hiermee kan je een sensor verwijderen
 router.get('/humidity/remove/:id', function (req, res, next) {
     var id = req.params.id
     http_stream.get("http://localhost:3001/api/streamdata/humidity/remove/"+id, function(data) {
@@ -108,6 +107,7 @@ router.get('/humidity/remove/:id', function (req, res, next) {
 
 })
 
+//hiermee krijg alle data terug van een id
 router.get('/humidity/:id', function (req, res, next) {
     influx.query(`
     select * from humidity
@@ -129,6 +129,7 @@ router.get('/humidity/:id', function (req, res, next) {
     })
 })
 
+//hiermee krijg je alle ids terug van de sensor type
 router.get('/humidity/sensors/totaal', function (req, res, next) {
     var totaal;
     http_stream.get("http://localhost:3001/humidity/sensors/totaal", function(data) {
@@ -137,18 +138,8 @@ router.get('/humidity/sensors/totaal', function (req, res, next) {
     })
 })
 
-influx.getDatabaseNames()
-    .then(names => {
-        if (!names.includes('metingen')) {
-            return influx.createDatabase('metingen')
-        }
-    })
-    .catch(err => {
-        console.error(`Error creating Influx database!`)
-    })
-
+//controleert of er nieuwe data is binnengekomen.
 function checkDataIntervals() {
-
     for(var i = 1; i <= TotalWorkingNodes; i++) {
         influx.query(`
      select * from humidity

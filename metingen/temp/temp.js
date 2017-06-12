@@ -11,6 +11,7 @@ var DataNotUpdatedCount
 var humid = require('../humidity/humid');
 var router = express.Router()
 
+//maak een schema van de database
 const influx = new Influx.InfluxDB({
     host: 'localhost',
     database: 'metingen',
@@ -32,7 +33,7 @@ var oldData = "dfsd"
 var timer = setInterval(getData, 3000);
 var timer1 = setInterval(checkDataIntervals, 5000)
 
-
+//krijg alle actievenodes
 function getData () {
     var i = 1;
     http_stream.get("http://localhost:3001/api/streamdata/activenodes/temp", function(data) {
@@ -50,6 +51,7 @@ function getData () {
     })
 }
 
+//controleer data en roep de fucntie om de data in de database te zetten.
 function processData(i){
     http_stream.get("http://localhost:3001/api/streamdata/temp/"+i, function (data) {
         var stringdata = data.toString()
@@ -81,6 +83,7 @@ function processData(i){
     })
 }
 
+//zet de streamdata in de database
 function insertData(graden, json, i){
         influx.writePoints([
             {
@@ -94,9 +97,12 @@ function insertData(graden, json, i){
         //  console.log("einde i: "+i)
 }
 
+//root api
 router.get('/', function (req, res) {
-    setTimeout(() => res.end('Hello world!'), Math.random() * 500)
+    setTimeout(() => res.end('ROOT API'), Math.random() * 500)
 })
+
+//hiermee kan je een sensor verwijderen
 router.get('/temp/remove/:id', function (req, res, next) {
     var id = req.params.id
     http_stream.get("http://localhost:3001/api/streamdata/temp/remove/"+id, function(data) {
@@ -105,6 +111,8 @@ router.get('/temp/remove/:id', function (req, res, next) {
     res.send('gelukt')
 
 })
+
+//hiermee krijg alle data terug van een id
 router.get('/temp/:id', function (req, res, next) {
     influx.query(`
     select * from temperatuur
@@ -126,6 +134,7 @@ router.get('/temp/:id', function (req, res, next) {
 })
 })
 
+//hiermee krijg je alle ids terug van de sensor type
 router.get('/temp/sensors/totaal', function (req, res, next) {
     var totaal;
     http_stream.get("http://localhost:3001/temp/sensors/totaal", function(data) {
@@ -134,6 +143,7 @@ router.get('/temp/sensors/totaal', function (req, res, next) {
     })
 })
 
+//in geval als er geen database is gemaakt, maak de database + error handeling
 influx.getDatabaseNames()
     .then(names => {
     if (!names.includes('metingen')) {
@@ -144,8 +154,8 @@ influx.getDatabaseNames()
     console.error(`Error creating Influx database!`)
 })
 
+//controleert of er nieuwe data is binnengekomen.
  function checkDataIntervals() {
-
     for(var i = 1; i <= TotalWorkingNodes; i++) {
         influx.query(`
      select * from temperatuur
@@ -168,6 +178,7 @@ influx.getDatabaseNames()
 
 }
 
+//geeft de data terug van een specefieke sensor, jaar, maand, id
 router.get('/:sensor/:year/:month/:id', function (req, res, next) {
     var year = req.params.year
     var sensor = req.params.sensor
@@ -185,9 +196,6 @@ router.get('/:sensor/:year/:month/:id', function (req, res, next) {
         sensor = 'light'
         datatype = "light"
     }
-    // select mean(`+datatype+`) from `+sensor+`
-    console.log("S:", sensor)
-    console.log("D", datatype)
     var getDaysInMonth = function(month,year) {
         return new Date(year, month, 0).getDate();
     };
